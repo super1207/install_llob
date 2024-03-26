@@ -68,14 +68,21 @@ fn app_exit() -> !{
     }
 }
 
+
+fn is_x86_64(exe_data: &[u8]) -> Result<bool, Box<dyn std::error::Error>> {
+    use goblin::Object;
+    match Object::parse(exe_data)? {
+        Object::PE(pe) => Ok(pe.is_64),
+        _ => Err("File is not a Windows PE file.".into()),
+    }
+}
+
 fn iswin32(qq_exe_path:&PathBuf) -> Result<bool, Box<dyn std::error::Error>>  {
     let content = std::fs::read(qq_exe_path)?;
-    let flag = content.get(0x80+4).ok_or("can't get pe info")?;
-    if flag == &0x4c {
-        return Ok(true);
-    }else {
+    if is_x86_64(&content)? {
         return Ok(false);
     }
+    Ok(true)
 }
 
 pub async fn github_proxy() -> Option<String> {

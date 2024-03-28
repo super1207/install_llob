@@ -1,0 +1,51 @@
+name: Build Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: 'Log level'
+        required: true
+        default: 'warning'
+
+jobs:
+  test:
+    name: build project
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@master
+
+
+    - name: build_windows
+      run: |
+        $ENV:RUSTFLAGS='-C target-feature=+crt-static'
+        rustup target add i686-pc-windows-msvc
+        cargo build --release --target i686-pc-windows-msvc
+      shell: pwsh
+        
+
+    - name: before_windows_upload
+      run: |
+        mkdir Release
+        cp target/i686-pc-windows-msvc/release/llob_install.exe Release/llob_install.exe
+      shell: pwsh
+    
+    - name: Strip and run UPX on executables
+      uses: crazy-max/ghaction-upx@v3
+      with:
+        version: latest
+        files: |
+            Release/llob_install.exe
+
+
+    - name: upload file1
+      uses: actions/upload-artifact@v3
+      with:
+        name: llob_install.exe
+        path: 
+            Release/llob_install.exe

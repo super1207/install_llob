@@ -293,7 +293,7 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>>{
 
     init_log();
 
-    log::info!("欢迎使用LLOB安装器0.0.1 by super1207");
+    log::info!("欢迎使用LLOB安装器0.0.2 by super1207");
 
     log::info!("正在检查是否拥有管理员权限...");
     let has_admin = is_admin().unwrap();

@@ -26,6 +26,30 @@ fn is_qq_run(qq_path:&PathBuf) -> Result<bool, Box<dyn std::error::Error>>  {
     Ok(false)
 }
 
+fn http_post(rt_ptr:Arc<tokio::runtime::Runtime>,url:&str,user_agent:Option<&str>) -> Vec<u8> {
+    let bin = rt_ptr.block_on(async {
+        let client = reqwest::Client::builder().danger_accept_invalid_certs(true).no_proxy().build().unwrap();
+        let mut req = client.get(url).body(reqwest::Body::from(vec![])).build().unwrap();
+        if let Some(ua) = user_agent {
+            req.headers_mut().append(HeaderName::from_str("User-Agent").unwrap(), HeaderValue::from_str(ua).unwrap());
+        }
+        let ret = client.execute(req).await;
+        if ret.is_err() {
+            log::error!("Failed to download file{:?}",ret.err().unwrap());
+            app_exit();
+        }
+        let ret = ret.unwrap();
+        let bin = ret.bytes().await;
+        if bin.is_err() {
+            log::error!("Failed to download file{:?}",bin.err().unwrap());
+            app_exit();
+        }
+        let bin = bin.unwrap();
+        bin.to_vec()
+    });
+    bin
+}
+
 fn is_admin() -> Result<bool, Box<dyn std::error::Error>>  {
     let output = Command::new("net")
         .arg("session")
@@ -165,17 +189,17 @@ fn extrat(from:&PathBuf,to:&PathBuf,flag:bool) -> Result<(),Box<dyn std::error::
         }
 
         if (*file.name()).ends_with('/') {
-            log::info!("File {} extracted to \"{}\"", i, outpath.display());
+            // log::info!("File {} extracted to \"{}\"", i, outpath.display());
             std::fs::create_dir_all(&outpath)?;
             
             
         } else {
-            log::info!(
-                "File {} extracted to \"{}\" ({} bytes)",
-                i,
-                outpath.display(),
-                file.size()
-            );
+            // log::info!(
+            //     "File {} extracted to \"{}\" ({} bytes)",
+            //     i,
+            //     outpath.display(),
+            //     file.size()
+            // );
             if let Some(p) = outpath.parent() {
                 if !p.exists() {
                     std::fs::create_dir_all(p)?;
@@ -275,24 +299,7 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>>{
 
     log::info!("正在获取最新QQNTFileVerifyPatch版本号...");
     let url = "https://api.github.com/repos/LiteLoaderQQNT/QQNTFileVerifyPatch/releases/latest";
-    let bin = rt_ptr.block_on(async {
-        let client = reqwest::Client::builder().danger_accept_invalid_certs(true).no_proxy().build().unwrap();
-        let mut req = client.get(url).body(reqwest::Body::from(vec![])).build().unwrap();
-        req.headers_mut().append(HeaderName::from_str("User-Agent").unwrap(), HeaderValue::from_str("Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Safari/537.36").unwrap());
-        let ret = client.execute(req).await;
-        if ret.is_err() {
-            log::error!("Failed to download file{:?}",ret.err().unwrap());
-            app_exit();
-        }
-        let ret = ret.unwrap();
-        let bin = ret.bytes().await;
-        if bin.is_err() {
-            log::error!("Failed to download file{:?}",bin.err().unwrap());
-            app_exit();
-        }
-        let bin = bin.unwrap();
-        bin.to_vec()
-    });
+    let bin = http_post(rt_ptr.clone(),url,Some("Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Safari/537.36"));
     let version_json:serde_json::Value = serde_json::from_slice(&bin)?;
     let tag_name = version_json["tag_name"].as_str().ok_or("Failed to get tag_name")?;
     log::info!("最新QQNTFileVerifyPatch版本号:{tag_name}");
@@ -304,23 +311,7 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>>{
     }else{
         patch_url = format!("{git_proxy}https://github.com/LiteLoaderQQNT/QQNTFileVerifyPatch/releases/download/{tag_name}/dbghelp_x64.dll");
     }
-
-    let bin = rt_ptr.block_on(async {
-        let ret = reqwest::get(patch_url).await;
-        if ret.is_err() {
-            log::error!("Failed to download patch file{:?}",ret.err().unwrap());
-            app_exit();
-        }
-        let ret = ret.unwrap();
-        let bin = ret.bytes().await;
-        if bin.is_err() {
-            log::error!("Failed to download patch file{:?}",bin.err().unwrap());
-            app_exit();
-        }
-        let bin = bin.unwrap();
-        bin.to_vec()
-    });
-
+    let bin = http_post(rt_ptr.clone(),&patch_url,None);
     log::info!("修补文件下载完成");
 
     log::info!("正在修补...");
@@ -328,23 +319,8 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>>{
     log::info!("修补完成");
 
     log::info!("正在下载LiteLoader项目...");
-    let bin;
     let patch_url = format!("{git_proxy}https://github.com/LiteLoaderQQNT/LiteLoaderQQNT/archive/master.zip");
-    bin = rt_ptr.block_on(async {
-        let ret = reqwest::get(patch_url).await;
-        if ret.is_err() {
-            log::error!("Failed to download patch file{:?}",ret.err().unwrap());
-            app_exit();
-        }
-        let ret = ret.unwrap();
-        let bin = ret.bytes().await;
-        if bin.is_err() {
-            log::error!("Failed to download patch file{:?}",bin.err().unwrap());
-            app_exit();
-        }
-        let bin = bin.unwrap();
-        bin.to_vec()
-    });
+    let bin = http_post(rt_ptr.clone(),&patch_url,None);
     log::info!("下载完成");
 
     log::info!("正在解压...");
@@ -371,48 +347,15 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>>{
 
     log::info!("正在获取最新LLOB版本号...");
     let url = "https://api.github.com/repos/LLOneBot/LLOneBot/releases/latest";
-    let bin = rt_ptr.block_on(async {
-        let client = reqwest::Client::builder().danger_accept_invalid_certs(true).no_proxy().build().unwrap();
-        let mut req = client.get(url).body(reqwest::Body::from(vec![])).build().unwrap();
-        req.headers_mut().append(HeaderName::from_str("User-Agent").unwrap(), HeaderValue::from_str("Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Safari/537.36").unwrap());
-        let ret = client.execute(req).await;
-        if ret.is_err() {
-            log::error!("Failed to download file{:?}",ret.err().unwrap());
-            app_exit();
-        }
-        let ret = ret.unwrap();
-        let bin = ret.bytes().await;
-        if bin.is_err() {
-            log::error!("Failed to download file{:?}",bin.err().unwrap());
-            app_exit();
-        }
-        let bin = bin.unwrap();
-        bin.to_vec()
-    });
-
+    let bin = http_post(rt_ptr.clone(),url,Some("Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Safari/537.36"));
     let version_json:serde_json::Value = serde_json::from_slice(&bin)?;
     let tag_name = version_json["tag_name"].as_str().ok_or("Failed to get tag_name")?;
     log::info!("最新LLOB版本号:{tag_name}");
 
     log::info!("正在下载LLOB项目...");
 
-    let bin;
     let patch_url = format!("{git_proxy}https://github.com/LLOneBot/LLOneBot/releases/download/{tag_name}/LLOneBot.zip");
-    bin = rt_ptr.block_on(async {
-        let ret = reqwest::get(patch_url).await;
-        if ret.is_err() {
-            log::error!("Failed to download patch file{:?}",ret.err().unwrap());
-            app_exit();
-        }
-        let ret = ret.unwrap();
-        let bin = ret.bytes().await;
-        if bin.is_err() {
-            log::error!("Failed to download patch file{:?}",bin.err().unwrap());
-            app_exit();
-        }
-        let bin = bin.unwrap();
-        bin.to_vec()
-    });
+    let bin = http_post(rt_ptr.clone(),&patch_url,None);
     log::info!("下载完成");
 
     log::info!("正在安装LLOnebOT...");

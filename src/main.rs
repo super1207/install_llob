@@ -1,16 +1,72 @@
 use std::{fs::{self}, path::PathBuf, process::Command, str::FromStr, sync::Arc};
 
+use path_clean::PathClean;
 use regex::Regex;
 use reqwest::header::{HeaderName, HeaderValue};
 use time::UtcOffset;
 use ::time::format_description;
 
-fn get_qq_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
+
+fn get_apath(path:&PathBuf) -> PathBuf {
+    let apath;
+    if path.is_absolute() {
+        apath = path.clean();
+    }else{
+        apath = std::env::current_dir().unwrap().join(path).clean();
+    }
+    apath
+}
+
+fn get_qq_path_by_reg() -> Result<PathBuf, Box<dyn std::error::Error>> {
     let hkcu = winreg::RegKey::predef(winreg::enums::HKEY_LOCAL_MACHINE);
     let qq_setting: winreg::RegKey = hkcu.open_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\QQ")?;
     let qq_path:String = qq_setting.get_value("UninstallString")?;
     let q = PathBuf::from_str(&qq_path)?.parent().ok_or("can't find qq path")?.to_owned();
     Ok(q)
+}
+
+fn get_qq_path_by_current_exe_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
+    let current_exe_path = std::env::current_exe()?;
+    let current_path = current_exe_path.parent().ok_or("can't find current path")?;
+    let qq_path = current_path.join("QQ.exe");
+    if qq_path.is_file() {
+        return Ok(current_path.to_path_buf());
+    }
+    Err("can't find qq.exe on current path".into())
+}
+
+fn get_qq_path_by_cfg() -> Result<PathBuf, Box<dyn std::error::Error>> {
+    let current_exe_path = std::env::current_exe()?;
+    let current_path = current_exe_path.parent().ok_or("can't find current path")?;
+    let cfg_file = current_path.join("llob_install.json");
+    let json_str = fs::read_to_string(cfg_file)?;
+    let json:serde_json::Value = serde_json::from_str(&json_str)?;
+    let qq_path_str = json["qq_exe_path"].as_str().ok_or("failed to get qq_exe_path")?;
+    let qq_exe_path = PathBuf::from(qq_path_str);
+    let qq_exe_path_t = get_apath(&qq_exe_path);
+    if qq_exe_path_t.is_file() {
+        return Ok(qq_exe_path_t.parent().ok_or("can't find qq path")?.to_path_buf());
+    }
+    Err("can't find qq.exe llob_install.json".into())
+}
+
+fn get_qq_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
+    // 先看配置文件
+    if let Ok(qq_path) = get_qq_path_by_cfg() {
+        log::info!("从配置文件获取到QQ.exe");
+        return Ok(qq_path);
+    }
+    // 再看当前目录
+    if let Ok(qq_path) = get_qq_path_by_current_exe_path() {
+        log::info!("从当前位置获取到QQ.exe");
+        return Ok(qq_path);
+    }
+    // 再看注册表
+    if let Ok(qq_path) = get_qq_path_by_reg() {
+        log::info!("从注册表获取到QQ.exe");
+        return Ok(qq_path);
+    }
+    Err("can't find qq path".into())
 }
 
 fn is_qq_run(qq_path:&PathBuf) -> Result<bool, Box<dyn std::error::Error>>  {
@@ -233,7 +289,6 @@ fn main(){
 
 fn mymain() -> Result<(), Box<dyn std::error::Error>>{
 
-
     let rt_ptr:Arc<tokio::runtime::Runtime> = Arc::new(tokio::runtime::Runtime::new().unwrap());
 
     init_log();
@@ -241,7 +296,8 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>>{
     log::info!("欢迎使用LLOB安装器0.0.1 by super1207");
 
     log::info!("正在检查是否拥有管理员权限...");
-    if is_admin().unwrap() {
+    let has_admin = is_admin().unwrap();
+    if has_admin {
         log::info!("拥有管理员权限");
     } else {
         log::error!("没有管理员权限");

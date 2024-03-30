@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 goblin = "0.8.0"
 log = "0.4.21"
+path-clean = "1.0.1"
 regex = "1.10.4"
 reqwest = "0.12.2"
 serde_json = "1.0.115"

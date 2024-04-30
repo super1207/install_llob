@@ -138,6 +138,8 @@ fn is_admin() -> Result<bool, Box<dyn std::error::Error>>  {
         } else {
             Ok(false)
         }
+    } else {
+        Ok(false)
     }
 }
 

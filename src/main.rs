@@ -6,6 +6,13 @@ use reqwest::header::{HeaderName, HeaderValue};
 use time::UtcOffset;
 use ::time::format_description;
 
+use winapi::um::securitybaseapi::OpenProcessToken;
+use winapi::um::processthreadsapi::GetCurrentProcess;
+use winapi::um::winnt::{TokenElevation, TOKEN_QUERY, TOKEN_ELEVATION};
+use winapi::um::handleapi::CloseHandle;
+use std::ptr::null_mut;
+use std::mem::{size_of, zeroed};
+
 
 fn get_apath(path:&PathBuf) -> PathBuf {
     let apath;
@@ -107,13 +114,30 @@ fn http_post(rt_ptr:Arc<tokio::runtime::Runtime>,url:&str,user_agent:Option<&str
 }
 
 fn is_admin() -> Result<bool, Box<dyn std::error::Error>>  {
-    let output = Command::new("net")
-        .arg("session")
-        .output()?;
-    if output.status.success() {
-        Ok(true)
-    } else {
-        Ok(false)
+    let mut token: winapi::um::winnt::HANDLE = null_mut();
+    let process = unsafe { GetCurrentProcess() };
+
+    if unsafe { OpenProcessToken(process, TOKEN_QUERY, &mut token) } != 0 {
+        let mut elevation: TOKEN_ELEVATION = unsafe { zeroed() };
+        let mut ret_length = 0;
+
+        let success = unsafe {
+            winapi::um::processthreadsapi::GetTokenInformation(
+                token,
+                TokenElevation,
+                &mut elevation as *mut _ as winapi::shared::minwindef::LPVOID,
+                size_of::<TOKEN_ELEVATION>() as u32,
+                &mut ret_length,
+            )
+        };
+
+        unsafe { CloseHandle(token) };
+
+        if success != 0 && elevation.TokenIsElevated != 0 {
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 }
 

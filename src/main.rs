@@ -6,8 +6,7 @@ use reqwest::header::{HeaderName, HeaderValue};
 use time::UtcOffset;
 use ::time::format_description;
 
-use winapi::um::securitybaseapi::OpenProcessToken;
-use winapi::um::processthreadsapi::GetCurrentProcess;
+use winapi::um::processthreadsapi::{OpenProcessToken, GetCurrentProcess, GetTokenInformation};
 use winapi::um::winnt::{TokenElevation, TOKEN_QUERY, TOKEN_ELEVATION};
 use winapi::um::handleapi::CloseHandle;
 use std::ptr::null_mut;

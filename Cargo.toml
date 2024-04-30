@@ -17,6 +17,7 @@ time = { version = "0.3.34", features = ["formatting", "macros","local-offset"] 
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter","time","local-time"]}
+winapi = "0.3.9"
 zip = "0.6.6"
 
 

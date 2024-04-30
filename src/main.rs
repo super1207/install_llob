@@ -6,7 +6,8 @@ use reqwest::header::{HeaderName, HeaderValue};
 use time::UtcOffset;
 use ::time::format_description;
 
-use winapi::um::processthreadsapi::{OpenProcessToken, GetCurrentProcess, GetTokenInformation};
+use winapi::um::securitybaseapi::{OpenProcessToken, GetTokenInformation};
+use winapi::um::processthreadsapi::GetCurrentProcess;
 use winapi::um::winnt::{TokenElevation, TOKEN_QUERY, TOKEN_ELEVATION};
 use winapi::um::handleapi::CloseHandle;
 use std::ptr::null_mut;
@@ -121,7 +122,7 @@ fn is_admin() -> Result<bool, Box<dyn std::error::Error>>  {
         let mut ret_length = 0;
 
         let success = unsafe {
-            winapi::um::processthreadsapi::GetTokenInformation(
+            GetTokenInformation(
                 token,
                 TokenElevation,
                 &mut elevation as *mut _ as winapi::shared::minwindef::LPVOID,

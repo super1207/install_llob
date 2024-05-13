@@ -622,6 +622,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "winapi",
  "winreg",
  "winres",
  "zip",

@@ -1,4 +1,4 @@
-use std::{fs::{self}, path::PathBuf, process::Command, str::FromStr, sync::Arc};
+use std::{fs::{self}, path::PathBuf, str::FromStr, sync::Arc};
 
 use path_clean::PathClean;
 use regex::Regex;
@@ -319,7 +319,7 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>>{
 
     init_log();
 
-    log::info!("欢迎使用LLOB安装器0.0.3 by super1207");
+    log::info!("欢迎使用LLOB安装器0.0.4 by super1207");
 
     log::info!("正在检查是否拥有管理员权限...");
     let has_admin = is_admin().unwrap();
@@ -406,26 +406,16 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>>{
     log::info!("下载完成");
 
     log::info!("正在解压...");
-    let zip_path = qq_path.join("resources").join("app").join("LiteLoaderQQNT-main.zip");
+    let userdir = PathBuf::from_str(&std::env::var("USERPROFILE")?)?;
+    let zip_path = userdir.join("LiteLoaderQQNT-main.zip");
     fs::write(&zip_path, bin)?;
     extrat(&zip_path, &zip_path.parent().ok_or("can't get parent")?.join("LiteLoaderQQNT-main"),true)?;
     log::info!("解压完成");
 
-    let mut is_install = false;
     let index_file_path = qq_path.join("resources").join("app").join("app_launcher").join("index.js");
-    if let Ok(index_content) = fs::read_to_string(&index_file_path) {
-        if index_content.contains("LiteLoaderQQNT") {
-            is_install = true;
-        }
-    }
-
-    if is_install {
-        log::info!("LiteLoaderQQNT已安装");
-    }else {
-        log::info!("正在安装LiteLoaderQQNT...");
-        fs::write(index_file_path, "require(`../LiteLoaderQQNT-main`);\r\nrequire('./launcher.node').load('external_index', module);")?;
-        log::info!("LiteLoaderQQNT安装完成");
-    }
+    log::info!("正在安装LiteLoaderQQNT...");
+    fs::write(index_file_path, "require(String.raw`".to_owned()+ &userdir.join("LiteLoaderQQNT-main").to_string_lossy().to_string() + "`);\r\nrequire('./launcher.node').load('external_index', module);")?;
+    log::info!("LiteLoaderQQNT安装完成");
 
     log::info!("正在获取最新LLOB版本号...");
     let url = "https://api.github.com/repos/LLOneBot/LLOneBot/releases/latest";
@@ -441,29 +431,13 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>>{
     log::info!("下载完成");
 
     log::info!("正在安装LLOnebOT...");
-    let zip_path = qq_path.join("resources").join("app").join("LiteLoaderQQNT-main").join("plugins").join(format!("LLOneBot{tag_name}.zip"));
+    let zip_path = userdir.join("LiteLoaderQQNT-main").join("plugins").join(format!("LLOneBot{tag_name}.zip"));
     std::fs::create_dir_all(zip_path.parent().ok_or("can't get parent")?)?;
     fs::write(&zip_path, bin)?;
     extrat(&zip_path, &zip_path.parent().ok_or("can't get parent")?.join("LLOneBot"),false)?;
     log::info!("安装完成");
 
-
-    let username = std::env::var("USERNAME")?;
-    log::info!("正在授予当前用户QQ文件夹访问权限...");
-    let mut binding = Command::new("icacls");
-    let cm = binding
-        .arg(format!("{}\\*",qq_path.to_string_lossy().to_string()))
-        .arg("/t")
-        .arg("/grant")
-        .arg(format!("{username}:F"));
- 
-    let output = cm.output()?;
-    if output.status.success() {
-        log::info!("授予成功！！！！！！！！！享受快乐时光吧");
-    } else {
-        log::error!("授予失败:{:?}", String::from_utf8_lossy(&output.stderr));
-        app_exit();
-    }
-
+    log::info!("安装成功！！！！！！！！！享受快乐时光吧");
+    
     Ok(())
 }

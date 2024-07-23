@@ -1,7 +1,6 @@
 use std::{fs::{self}, path::PathBuf, str::FromStr, sync::Arc};
 
 use path_clean::PathClean;
-use regex::Regex;
 use reqwest::header::{HeaderName, HeaderValue};
 use time::UtcOffset;
 use ::time::format_description;
@@ -192,22 +191,21 @@ fn iswin32(qq_exe_path:&PathBuf) -> Result<bool, Box<dyn std::error::Error>>  {
 }
 
 pub async fn github_proxy() -> Option<String> {
-    let urls_to_test = ["https://mirror.ghproxy.com/", "https://github.moeyy.xyz/","https://github.moeyy.cn/",""];
+    let urls_to_test = ["https://kkgithub.com", "https://dgithub.xyz","https://gh.jiasu.in/https://github.com","https://github.com"];
     let (tx, mut rx) =  tokio::sync::mpsc::channel(urls_to_test.len() + 1);
     for url in urls_to_test {
         let tx = tx.clone();
         tokio::spawn(async move{
             let client = reqwest::Client::builder().danger_accept_invalid_certs(true).no_proxy().build().unwrap();
             let uri = reqwest::Url::from_str(&(url.to_owned() + 
-				"https://raw.githubusercontent.com/super1207/redreply/master/res/version.txt")).unwrap();
+				"/LiteLoaderQQNT/QQNTFileVerifyPatch/releases/download/DllHijack_1.0.8/dbghelp_x64.dll")).unwrap();
             let req = client.get(uri).build().unwrap();
             if let Ok(ret) = client.execute(req).await {
                 if ret.status() == reqwest::StatusCode::OK {
-                    if let Ok(text) = ret.text().await {
-                        let re = Regex::new(r"^\d+\.\d+\.\d+$").unwrap();
-                        if re.is_match(&text) {
+                    if let Ok(bin) = ret.bytes().await {
+                        if bin.starts_with(&[b'M',b'Z']) {
                             let _err = tx.send(url).await;
-                        } 
+                        }
                     }
                 }
             }; 
@@ -319,7 +317,7 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>>{
 
     init_log();
 
-    log::info!("欢迎使用LLOB安装器0.0.4 by super1207");
+    log::info!("欢迎使用LLOB安装器0.0.5 by super1207");
 
     log::info!("正在检查是否拥有管理员权限...");
     let has_admin = is_admin().unwrap();
@@ -367,7 +365,7 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>>{
     log::info!("正在获取github下载代理...");
     let git_proxy = rt_ptr.block_on(async {
         if let Some(proxy_t) = github_proxy().await {
-            if proxy_t == "" {
+            if proxy_t == "https://github.com" {
                 log::info!("无需使用代理即可连接github");
             }else{
                 log::info!("使用代理: {:?}", proxy_t);
@@ -389,9 +387,9 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>>{
     log::info!("正在下载修补文件...");
     let patch_url;
     if is_win32 {
-        patch_url = format!("{git_proxy}https://github.com/LiteLoaderQQNT/QQNTFileVerifyPatch/releases/download/{tag_name}/dbghelp_x86.dll");
+        patch_url = format!("{git_proxy}/LiteLoaderQQNT/QQNTFileVerifyPatch/releases/download/{tag_name}/dbghelp_x86.dll");
     }else{
-        patch_url = format!("{git_proxy}https://github.com/LiteLoaderQQNT/QQNTFileVerifyPatch/releases/download/{tag_name}/dbghelp_x64.dll");
+        patch_url = format!("{git_proxy}/LiteLoaderQQNT/QQNTFileVerifyPatch/releases/download/{tag_name}/dbghelp_x64.dll");
     }
     let bin = http_post(rt_ptr.clone(),&patch_url,None);
     log::info!("修补文件下载完成");
@@ -401,7 +399,7 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>>{
     log::info!("修补完成");
 
     log::info!("正在下载LiteLoader项目...");
-    let patch_url = format!("{git_proxy}https://github.com/LiteLoaderQQNT/LiteLoaderQQNT/archive/master.zip");
+    let patch_url = format!("{git_proxy}/LiteLoaderQQNT/LiteLoaderQQNT/archive/master.zip");
     let bin = http_post(rt_ptr.clone(),&patch_url,None);
     log::info!("下载完成");
 
@@ -426,7 +424,7 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>>{
 
     log::info!("正在下载LLOB项目...");
 
-    let patch_url = format!("{git_proxy}https://github.com/LLOneBot/LLOneBot/releases/download/{tag_name}/LLOneBot.zip");
+    let patch_url = format!("{git_proxy}/LLOneBot/LLOneBot/releases/download/{tag_name}/LLOneBot.zip");
     let bin = http_post(rt_ptr.clone(),&patch_url,None);
     log::info!("下载完成");
 

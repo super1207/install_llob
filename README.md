@@ -49,3 +49,9 @@ Priority: Configuration file > llob_install.exe directory > Registry
 ## License
 
 MIT
+
+## 其它注意事项
+1. 确保您已经安装最新版本的NTQQ，您应该在[QQ官网](https://im.qq.com/pcqq/index.shtml)下载的最新版本的NTQQ，并且通过双击QQ安装包来安装QQ。
+2. 确保使用install_llob.exe之前，QQ处于关闭状态。
+3. 如果QQ自动更新了，您可以重新运行install_llob.exe来安装llonebot，您的配置信息不会丢失。
+4. 如果您仍然对安装过程有所疑惑，可以看看安装视频：[视频链接](https://files.catbox.moe/psdz7v.mp4)

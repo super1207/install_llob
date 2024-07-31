@@ -1,23 +1,27 @@
-use std::{fs::{self}, path::PathBuf, str::FromStr, sync::Arc};
+use std::{
+    fs::{self},
+    path::PathBuf,
+    str::FromStr,
+    sync::Arc,
+};
 
+use ::time::format_description;
 use path_clean::PathClean;
 use reqwest::header::{HeaderName, HeaderValue};
 use time::UtcOffset;
-use ::time::format_description;
 
-use winapi::um::securitybaseapi::GetTokenInformation;
-use winapi::um::processthreadsapi::{OpenProcessToken, GetCurrentProcess};
-use winapi::um::winnt::{TokenElevation, TOKEN_QUERY, TOKEN_ELEVATION};
-use winapi::um::handleapi::CloseHandle;
-use std::ptr::null_mut;
 use std::mem::{size_of, zeroed};
+use std::ptr::null_mut;
+use winapi::um::handleapi::CloseHandle;
+use winapi::um::processthreadsapi::{GetCurrentProcess, OpenProcessToken};
+use winapi::um::securitybaseapi::GetTokenInformation;
+use winapi::um::winnt::{TokenElevation, TOKEN_ELEVATION, TOKEN_QUERY};
 
-
-fn get_apath(path:&PathBuf) -> PathBuf {
+fn get_apath(path: &PathBuf) -> PathBuf {
     let apath;
     if path.is_absolute() {
         apath = path.clean();
-    }else{
+    } else {
         apath = std::env::current_dir().unwrap().join(path).clean();
     }
     apath
@@ -25,9 +29,13 @@ fn get_apath(path:&PathBuf) -> PathBuf {
 
 fn get_qq_path_by_reg() -> Result<PathBuf, Box<dyn std::error::Error>> {
     let hkcu = winreg::RegKey::predef(winreg::enums::HKEY_LOCAL_MACHINE);
-    let qq_setting: winreg::RegKey = hkcu.open_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\QQ")?;
-    let qq_path:String = qq_setting.get_value("UninstallString")?;
-    let q = PathBuf::from_str(&qq_path)?.parent().ok_or("can't find qq path")?.to_owned();
+    let qq_setting: winreg::RegKey =
+        hkcu.open_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\QQ")?;
+    let qq_path: String = qq_setting.get_value("UninstallString")?;
+    let q = PathBuf::from_str(&qq_path)?
+        .parent()
+        .ok_or("can't find qq path")?
+        .to_owned();
     Ok(q)
 }
 
@@ -46,12 +54,17 @@ fn get_qq_path_by_cfg() -> Result<PathBuf, Box<dyn std::error::Error>> {
     let current_path = current_exe_path.parent().ok_or("can't find current path")?;
     let cfg_file = current_path.join("llob_install.json");
     let json_str = fs::read_to_string(cfg_file)?;
-    let json:serde_json::Value = serde_json::from_str(&json_str)?;
-    let qq_path_str = json["qq_exe_path"].as_str().ok_or("failed to get qq_exe_path")?;
+    let json: serde_json::Value = serde_json::from_str(&json_str)?;
+    let qq_path_str = json["qq_exe_path"]
+        .as_str()
+        .ok_or("failed to get qq_exe_path")?;
     let qq_exe_path = PathBuf::from(qq_path_str);
     let qq_exe_path_t = get_apath(&qq_exe_path);
     if qq_exe_path_t.is_file() {
-        return Ok(qq_exe_path_t.parent().ok_or("can't find qq path")?.to_path_buf());
+        return Ok(qq_exe_path_t
+            .parent()
+            .ok_or("can't find qq path")?
+            .to_path_buf());
     }
     Err("can't find qq.exe llob_install.json".into())
 }
@@ -75,16 +88,18 @@ fn get_qq_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
     Err("can't find qq path".into())
 }
 
-fn is_qq_run(qq_path:&PathBuf) -> Result<bool, Box<dyn std::error::Error>>  {
+fn is_qq_run(qq_path: &PathBuf) -> Result<bool, Box<dyn std::error::Error>> {
     let system = sysinfo::System::new_all();
     let process_name = "QQ.exe";
     if let Some(process) = system.processes_by_name(process_name).next() {
         let process_exe_path = process.exe().ok_or("can't get process exe path")?;
-        let process_path = process_exe_path.parent().ok_or("can't get process parent path")?;
+        let process_path = process_exe_path
+            .parent()
+            .ok_or("can't get process parent path")?;
         if process_path == qq_path {
-            return Ok(true)
+            return Ok(true);
         }
-    } 
+    }
     Ok(false)
 }
 
@@ -95,9 +110,16 @@ fn http_post(rt_ptr: Arc<tokio::runtime::Runtime>, url: &str, user_agent: Option
             .no_proxy()
             .build()
             .unwrap();
-        let mut req = client.get(url).body(reqwest::Body::from(vec![])).build().unwrap();
+        let mut req = client
+            .get(url)
+            .body(reqwest::Body::from(vec![]))
+            .build()
+            .unwrap();
         if let Some(ua) = user_agent {
-            req.headers_mut().append(HeaderName::from_str("User-Agent").unwrap(), HeaderValue::from_str(ua).unwrap());
+            req.headers_mut().append(
+                HeaderName::from_str("User-Agent").unwrap(),
+                HeaderValue::from_str(ua).unwrap(),
+            );
         }
         let ret = client.execute(req).await;
         if ret.is_err() {
@@ -116,7 +138,7 @@ fn http_post(rt_ptr: Arc<tokio::runtime::Runtime>, url: &str, user_agent: Option
     bin
 }
 
-fn is_admin() -> Result<bool, Box<dyn std::error::Error>>  {
+fn is_admin() -> Result<bool, Box<dyn std::error::Error>> {
     let mut token: winapi::um::winnt::HANDLE = null_mut();
     let process = unsafe { GetCurrentProcess() };
 
@@ -146,8 +168,7 @@ fn is_admin() -> Result<bool, Box<dyn std::error::Error>>  {
     }
 }
 
-
-fn init_log(){
+fn init_log() {
     // 初始化日志
     let format = "[year]-[month]-[day] [hour]:[minute]:[second]";
 
@@ -157,26 +178,25 @@ fn init_log(){
         utc_offset = v;
     } else {
         // 中国是东八区，所以这里写8 hour
-        utc_offset = UtcOffset::from_hms(8,0,0).unwrap();
+        utc_offset = UtcOffset::from_hms(8, 0, 0).unwrap();
     }
 
     tracing_subscriber::fmt()
-    .with_timer(tracing_subscriber::fmt::time::OffsetTime::new(
-        utc_offset,
-        format_description::parse(format).unwrap(),
-    ))
-    .with_ansi(false)
-    .with_max_level(tracing::Level::INFO)
-    .init();
+        .with_timer(tracing_subscriber::fmt::time::OffsetTime::new(
+            utc_offset,
+            format_description::parse(format).unwrap(),
+        ))
+        .with_ansi(false)
+        .with_max_level(tracing::Level::INFO)
+        .init();
 }
 
-fn app_exit() -> !{
+fn app_exit() -> ! {
     loop {
         let time_struct = core::time::Duration::from_millis(500);
         std::thread::sleep(time_struct);
     }
 }
-
 
 fn is_x86_64(exe_data: &[u8]) -> Result<bool, Box<dyn std::error::Error>> {
     use goblin::Object;
@@ -186,7 +206,7 @@ fn is_x86_64(exe_data: &[u8]) -> Result<bool, Box<dyn std::error::Error>> {
     }
 }
 
-fn iswin32(qq_exe_path:&PathBuf) -> Result<bool, Box<dyn std::error::Error>>  {
+fn iswin32(qq_exe_path: &PathBuf) -> Result<bool, Box<dyn std::error::Error>> {
     let content = std::fs::read(qq_exe_path)?;
     if is_x86_64(&content)? {
         return Ok(false);
@@ -195,24 +215,32 @@ fn iswin32(qq_exe_path:&PathBuf) -> Result<bool, Box<dyn std::error::Error>>  {
 }
 
 pub async fn github_proxy() -> Option<String> {
-    let urls_to_test = ["https://kkgithub.com", "https://dgithub.xyz","https://gh.jiasu.in/https://github.com","https://github.com"];
-    let (tx, mut rx) =  tokio::sync::mpsc::channel(urls_to_test.len() + 1);
+    let urls_to_test = [
+        "https://kkgithub.com",
+        "https://dgithub.xyz",
+        "https://gh.jiasu.in/https://github.com",
+        "https://github.com",
+    ];
+    let (tx, mut rx) = tokio::sync::mpsc::channel(urls_to_test.len() + 1);
     for url in urls_to_test {
         let tx = tx.clone();
-        tokio::spawn(async move{
-            let client = reqwest::Client::builder().danger_accept_invalid_certs(true).no_proxy().build().unwrap();
-            let uri = reqwest::Url::from_str(&(url.to_owned() + 
-				"/LiteLoaderQQNT/QQNTFileVerifyPatch/releases/download/DllHijack_1.0.8/dbghelp_x64.dll")).unwrap();
+        tokio::spawn(async move {
+            let client = reqwest::Client::builder()
+                .danger_accept_invalid_certs(true)
+                .no_proxy()
+                .build()
+                .unwrap();
+            let uri = reqwest::Url::from_str(&(url.to_owned() + "/LiteLoaderQQNT/QQNTFileVerifyPatch/releases/download/DllHijack_1.0.8/dbghelp_x64.dll")).unwrap();
             let req = client.get(uri).build().unwrap();
             if let Ok(ret) = client.execute(req).await {
                 if ret.status() == reqwest::StatusCode::OK {
                     if let Ok(bin) = ret.bytes().await {
-                        if bin.starts_with(&[b'M',b'Z']) {
+                        if bin.starts_with(&[b'M', b'Z']) {
                             let _err = tx.send(url).await;
                         }
                     }
                 }
-            }; 
+            };
         });
     }
     tokio::spawn(async move {
@@ -228,7 +256,7 @@ pub async fn github_proxy() -> Option<String> {
     None
 }
 
-fn extrat(from:&PathBuf,to:&PathBuf,flag:bool) -> Result<(),Box<dyn std::error::Error>>{
+fn extrat(from: &PathBuf, to: &PathBuf, flag: bool) -> Result<(), Box<dyn std::error::Error>> {
     let file = std::fs::File::open(from)?;
 
     let mut archive = zip::ZipArchive::new(file)?;
@@ -252,19 +280,17 @@ fn extrat(from:&PathBuf,to:&PathBuf,flag:bool) -> Result<(),Box<dyn std::error::
                         continue;
                         //return Err("Path is too short to remove the last component".into());
                     }
-                }else{
+                } else {
                     let new_path = components[0..components.len()]
                         .iter()
                         .map(|c| c.as_os_str())
                         .collect::<PathBuf>();
                     to.join(new_path)
                 }
-                
-            },
+            }
             None => continue,
         };
 
-        
         {
             let comment = file.comment();
             if !comment.is_empty() {
@@ -275,8 +301,6 @@ fn extrat(from:&PathBuf,to:&PathBuf,flag:bool) -> Result<(),Box<dyn std::error::
         if (*file.name()).ends_with('/') {
             // log::info!("File {} extracted to \"{}\"", i, outpath.display());
             std::fs::create_dir_all(&outpath)?;
-            
-            
         } else {
             // log::info!(
             //     "File {} extracted to \"{}\" ({} bytes)",
@@ -305,7 +329,6 @@ fn extrat(from:&PathBuf,to:&PathBuf,flag:bool) -> Result<(),Box<dyn std::error::
     }
     Ok(())
 }
-
 
 fn main() {
     if let Err(e) = mymain() {
@@ -382,17 +405,20 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>> {
 
     log::info!("正在获取最新QQNTFileVerifyPatch版本号...");
     let url = "https://api.github.com/repos/LiteLoaderQQNT/QQNTFileVerifyPatch/releases/latest";
-    let bin = http_post(rt_ptr.clone(), url, Some("Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Safari/537.36"));
-    let version_json: serde_json::Value = match serde_json::from_slice(&bin) {
-        Ok(json) => json,
+    let bin = match std::panic::catch_unwind(|| {
+        http_post(rt_ptr.clone(), url, Some("Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Safari/537.36"))
+    }) {
+        Ok(bin) => bin,
         Err(_) => {
             log::warn!("无法访问GitHub，尝试使用备用URL");
             let backup_url = "https://api.hydroroll.team/api/version?repo=LiteLoaderQQNT/QQNTFileVerifyPatch&type=github-releases-latest";
-            let bin = http_post(rt_ptr.clone(), backup_url, Some("Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Safari/537.36"));
-            serde_json::from_slice(&bin)?
+            http_post(rt_ptr.clone(), backup_url, Some("Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Safari/537.36"))
         }
     };
-    let tag_name = version_json["tag_name"].as_str().ok_or("Failed to get tag_name")?;
+    let version_json: serde_json::Value = serde_json::from_slice(&bin)?;
+    let tag_name = version_json["tag_name"]
+        .as_str()
+        .ok_or("Failed to get tag_name")?;
     log::info!("最新QQNTFileVerifyPatch版本号:{tag_name}");
 
     log::info!("正在下载修补文件...");
@@ -418,32 +444,64 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>> {
     let userdir = PathBuf::from_str(&std::env::var("USERPROFILE")?)?;
     let zip_path = userdir.join("LiteLoaderQQNT-main.zip");
     fs::write(&zip_path, bin)?;
-    extrat(&zip_path, &zip_path.parent().ok_or("can't get parent")?.join("LiteLoaderQQNT-main"), true)?;
+    extrat(
+        &zip_path,
+        &zip_path
+            .parent()
+            .ok_or("can't get parent")?
+            .join("LiteLoaderQQNT-main"),
+        true,
+    )?;
     log::info!("解压完成");
 
-    let index_file_path = qq_path.join("resources").join("app").join("app_launcher").join("index.js");
+    let index_file_path = qq_path
+        .join("resources")
+        .join("app")
+        .join("app_launcher")
+        .join("index.js");
     log::info!("正在安装LiteLoaderQQNT...");
-    fs::write(index_file_path, "require(String.raw`".to_owned() + &userdir.join("LiteLoaderQQNT-main").to_string_lossy().to_string() + "`);\r\nrequire('./launcher.node').load('external_index', module);")?;
+    fs::write(
+        index_file_path,
+        "require(String.raw`".to_owned()
+            + &userdir
+                .join("LiteLoaderQQNT-main")
+                .to_string_lossy()
+                .to_string()
+            + "`);\r\nrequire('./launcher.node').load('external_index', module);",
+    )?;
     log::info!("LiteLoaderQQNT安装完成");
 
     log::info!("正在获取最新LLOB版本号...");
     let url = "https://api.github.com/repos/LLOneBot/LLOneBot/releases/latest";
-    let bin = http_post(rt_ptr.clone(), url, Some("Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Safari/537.36"));
+    let bin = http_post(rt_ptr.clone(),url,Some("Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Safari/537.36"));
     let version_json: serde_json::Value = serde_json::from_slice(&bin)?;
-    let tag_name = version_json["tag_name"].as_str().ok_or("Failed to get tag_name")?;
+    let tag_name = version_json["tag_name"]
+        .as_str()
+        .ok_or("Failed to get tag_name")?;
     log::info!("最新LLOB版本号:{tag_name}");
 
     log::info!("正在下载LLOB项目...");
 
-    let patch_url = format!("{git_proxy}/LLOneBot/LLOneBot/releases/download/{tag_name}/LLOneBot.zip");
+    let patch_url =
+        format!("{git_proxy}/LLOneBot/LLOneBot/releases/download/{tag_name}/LLOneBot.zip");
     let bin = http_post(rt_ptr.clone(), &patch_url, None);
     log::info!("下载完成");
 
     log::info!("正在安装LLOnebOT...");
-    let zip_path = userdir.join("LiteLoaderQQNT-main").join("plugins").join(format!("LLOneBot{tag_name}.zip"));
+    let zip_path = userdir
+        .join("LiteLoaderQQNT-main")
+        .join("plugins")
+        .join(format!("LLOneBot{tag_name}.zip"));
     std::fs::create_dir_all(zip_path.parent().ok_or("can't get parent")?)?;
     fs::write(&zip_path, bin)?;
-    extrat(&zip_path, &zip_path.parent().ok_or("can't get parent")?.join("LLOneBot"), false)?;
+    extrat(
+        &zip_path,
+        &zip_path
+            .parent()
+            .ok_or("can't get parent")?
+            .join("LLOneBot"),
+        false,
+    )?;
     log::info!("安装完成");
 
     log::info!("安装成功！！！！！！！！！享受快乐时光吧");

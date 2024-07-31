@@ -103,7 +103,7 @@ fn is_qq_run(qq_path: &PathBuf) -> Result<bool, Box<dyn std::error::Error>> {
     Ok(false)
 }
 
-fn http_post(rt_ptr: Arc<tokio::runtime::Runtime>, url: &str, user_agent: Option<&str>) -> Vec<u8> {
+fn http_post(rt_ptr: Arc<tokio::runtime::Runtime>, url: &str, user_agent: Option<&str>) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let bin = rt_ptr.block_on(async {
         let client = reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
@@ -124,16 +124,16 @@ fn http_post(rt_ptr: Arc<tokio::runtime::Runtime>, url: &str, user_agent: Option
         let ret = client.execute(req).await;
         if ret.is_err() {
             log::error!("Failed to download file{:?}", ret.err().unwrap());
-            app_exit();
+            return Err("Failed to download file".into());
         }
         let ret = ret.unwrap();
         let bin = ret.bytes().await;
         if bin.is_err() {
             log::error!("Failed to download file{:?}", bin.err().unwrap());
-            app_exit();
+            return Err("Failed to download file".into());
         }
         let bin = bin.unwrap();
-        bin.to_vec()
+        Ok(bin.to_vec())
     });
     bin
 }
@@ -415,6 +415,13 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>> {
             http_post(rt_ptr.clone(), backup_url, Some("Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Safari/537.36"))
         }
     };
+    let bin = match bin {
+        Ok(bin) => bin,
+        Err(_) => {
+            log::error!("无法获取最新QQNTFileVerifyPatch版本号");
+            app_exit();
+        }
+    };
     let version_json: serde_json::Value = serde_json::from_slice(&bin)?;
     let tag_name = version_json["tag_name"]
         .as_str()
@@ -428,7 +435,13 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         patch_url = format!("{git_proxy}/LiteLoaderQQNT/QQNTFileVerifyPatch/releases/download/{tag_name}/dbghelp_x64.dll");
     }
-    let bin = http_post(rt_ptr.clone(), &patch_url, None);
+    let bin = match http_post(rt_ptr.clone(), &patch_url, None) {
+        Ok(bin) => bin,
+        Err(_) => {
+            log::error!("修补文件下载失败");
+            app_exit();
+        }
+    };
     log::info!("修补文件下载完成");
 
     log::info!("正在修补...");
@@ -437,7 +450,13 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>> {
 
     log::info!("正在下载LiteLoader项目...");
     let patch_url = format!("{git_proxy}/LiteLoaderQQNT/LiteLoaderQQNT/archive/master.zip");
-    let bin = http_post(rt_ptr.clone(), &patch_url, None);
+    let bin = match http_post(rt_ptr.clone(), &patch_url, None) {
+        Ok(bin) => bin,
+        Err(_) => {
+            log::error!("LiteLoader项目下载失败");
+            app_exit();
+        }
+    };
     log::info!("下载完成");
 
     log::info!("正在解压...");
@@ -473,7 +492,13 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>> {
 
     log::info!("正在获取最新LLOB版本号...");
     let url = "https://api.github.com/repos/LLOneBot/LLOneBot/releases/latest";
-    let bin = http_post(rt_ptr.clone(),url,Some("Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Safari/537.36"));
+    let bin = match http_post(rt_ptr.clone(), url, Some("Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Safari/537.36")) {
+        Ok(bin) => bin,
+        Err(_) => {
+            log::error!("无法获取最新LLOB版本号");
+            app_exit();
+        }
+    };
     let version_json: serde_json::Value = serde_json::from_slice(&bin)?;
     let tag_name = version_json["tag_name"]
         .as_str()
@@ -481,10 +506,14 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>> {
     log::info!("最新LLOB版本号:{tag_name}");
 
     log::info!("正在下载LLOB项目...");
-
-    let patch_url =
-        format!("{git_proxy}/LLOneBot/LLOneBot/releases/download/{tag_name}/LLOneBot.zip");
-    let bin = http_post(rt_ptr.clone(), &patch_url, None);
+    let patch_url = format!("{git_proxy}/LLOneBot/LLOneBot/releases/download/{tag_name}/LLOneBot.zip");
+    let bin = match http_post(rt_ptr.clone(), &patch_url, None) {
+        Ok(bin) => bin,
+        Err(_) => {
+            log::error!("LLOB项目下载失败");
+            app_exit();
+        }
+    };
     log::info!("下载完成");
 
     log::info!("正在安装LLOnebOT...");

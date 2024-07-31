@@ -405,21 +405,18 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>> {
 
     log::info!("正在获取最新QQNTFileVerifyPatch版本号...");
     let url = "https://api.github.com/repos/LiteLoaderQQNT/QQNTFileVerifyPatch/releases/latest";
-    let bin = match std::panic::catch_unwind(|| {
-        http_post(rt_ptr.clone(), url, Some("Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Safari/537.36"))
-    }) {
+    let bin = match http_post(rt_ptr.clone(), url, Some("Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Safari/537.36")) {
         Ok(bin) => bin,
         Err(_) => {
             log::warn!("无法访问GitHub，尝试使用备用URL");
             let backup_url = "https://api.hydroroll.team/api/version?repo=LiteLoaderQQNT/QQNTFileVerifyPatch&type=github-releases-latest";
-            http_post(rt_ptr.clone(), backup_url, Some("Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Safari/537.36"))
-        }
-    };
-    let bin = match bin {
-        Ok(bin) => bin,
-        Err(_) => {
-            log::error!("无法获取最新QQNTFileVerifyPatch版本号");
-            app_exit();
+            match http_post(rt_ptr.clone(), backup_url, Some("Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Safari/537.36")) {
+                Ok(bin) => bin,
+                Err(_) => {
+                    log::error!("无法获取最新QQNTFileVerifyPatch版本号");
+                    app_exit();
+                }
+            }
         }
     };
     let version_json: serde_json::Value = serde_json::from_slice(&bin)?;

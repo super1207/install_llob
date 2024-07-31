@@ -88,22 +88,26 @@ fn is_qq_run(qq_path:&PathBuf) -> Result<bool, Box<dyn std::error::Error>>  {
     Ok(false)
 }
 
-fn http_post(rt_ptr:Arc<tokio::runtime::Runtime>,url:&str,user_agent:Option<&str>) -> Vec<u8> {
+fn http_post(rt_ptr: Arc<tokio::runtime::Runtime>, url: &str, user_agent: Option<&str>) -> Vec<u8> {
     let bin = rt_ptr.block_on(async {
-        let client = reqwest::Client::builder().danger_accept_invalid_certs(true).no_proxy().build().unwrap();
+        let client = reqwest::Client::builder()
+            .danger_accept_invalid_certs(true)
+            .no_proxy()
+            .build()
+            .unwrap();
         let mut req = client.get(url).body(reqwest::Body::from(vec![])).build().unwrap();
         if let Some(ua) = user_agent {
             req.headers_mut().append(HeaderName::from_str("User-Agent").unwrap(), HeaderValue::from_str(ua).unwrap());
         }
         let ret = client.execute(req).await;
         if ret.is_err() {
-            log::error!("Failed to download file{:?}",ret.err().unwrap());
+            log::error!("Failed to download file{:?}", ret.err().unwrap());
             app_exit();
         }
         let ret = ret.unwrap();
         let bin = ret.bytes().await;
         if bin.is_err() {
-            log::error!("Failed to download file{:?}",bin.err().unwrap());
+            log::error!("Failed to download file{:?}", bin.err().unwrap());
             app_exit();
         }
         let bin = bin.unwrap();
@@ -303,7 +307,7 @@ fn extrat(from:&PathBuf,to:&PathBuf,flag:bool) -> Result<(),Box<dyn std::error::
 }
 
 
-fn main(){
+fn main() {
     if let Err(e) = mymain() {
         log::error!("{e:?}");
         app_exit();
@@ -311,9 +315,8 @@ fn main(){
     app_exit();
 }
 
-fn mymain() -> Result<(), Box<dyn std::error::Error>>{
-
-    let rt_ptr:Arc<tokio::runtime::Runtime> = Arc::new(tokio::runtime::Runtime::new().unwrap());
+fn mymain() -> Result<(), Box<dyn std::error::Error>> {
+    let rt_ptr: Arc<tokio::runtime::Runtime> = Arc::new(tokio::runtime::Runtime::new().unwrap());
 
     init_log();
 
@@ -343,11 +346,11 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>>{
         Ok(is_run) => {
             if !is_run {
                 log::info!("QQ未运行");
-            }else{
+            } else {
                 log::error!("QQ正在运行，请先结束QQ");
                 app_exit();
             }
-        },
+        }
         Err(err) => {
             log::error!("无法检查QQ是否正在运行:{err:?}");
             app_exit();
@@ -358,7 +361,7 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>>{
     let is_win32 = iswin32(&qq_path.join("QQ.exe"))?;
     if is_win32 {
         log::info!("您安装的是32位的QQ");
-    }else{
+    } else {
         log::info!("您安装的是64位的QQ");
     }
 
@@ -367,7 +370,7 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>>{
         if let Some(proxy_t) = github_proxy().await {
             if proxy_t == "https://github.com" {
                 log::info!("无需使用代理即可连接github");
-            }else{
+            } else {
                 log::info!("使用代理: {:?}", proxy_t);
             }
             return proxy_t;
@@ -379,8 +382,16 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>>{
 
     log::info!("正在获取最新QQNTFileVerifyPatch版本号...");
     let url = "https://api.github.com/repos/LiteLoaderQQNT/QQNTFileVerifyPatch/releases/latest";
-    let bin = http_post(rt_ptr.clone(),url,Some("Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Safari/537.36"));
-    let version_json:serde_json::Value = serde_json::from_slice(&bin)?;
+    let bin = http_post(rt_ptr.clone(), url, Some("Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Safari/537.36"));
+    let version_json: serde_json::Value = match serde_json::from_slice(&bin) {
+        Ok(json) => json,
+        Err(_) => {
+            log::warn!("无法访问GitHub，尝试使用备用URL");
+            let backup_url = "https://api.hydroroll.team/api/version?repo=LiteLoaderQQNT/QQNTFileVerifyPatch&type=github-releases-latest";
+            let bin = http_post(rt_ptr.clone(), backup_url, Some("Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Safari/537.36"));
+            serde_json::from_slice(&bin)?
+        }
+    };
     let tag_name = version_json["tag_name"].as_str().ok_or("Failed to get tag_name")?;
     log::info!("最新QQNTFileVerifyPatch版本号:{tag_name}");
 
@@ -388,10 +399,10 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>>{
     let patch_url;
     if is_win32 {
         patch_url = format!("{git_proxy}/LiteLoaderQQNT/QQNTFileVerifyPatch/releases/download/{tag_name}/dbghelp_x86.dll");
-    }else{
+    } else {
         patch_url = format!("{git_proxy}/LiteLoaderQQNT/QQNTFileVerifyPatch/releases/download/{tag_name}/dbghelp_x64.dll");
     }
-    let bin = http_post(rt_ptr.clone(),&patch_url,None);
+    let bin = http_post(rt_ptr.clone(), &patch_url, None);
     log::info!("修补文件下载完成");
 
     log::info!("正在修补...");
@@ -400,42 +411,42 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>>{
 
     log::info!("正在下载LiteLoader项目...");
     let patch_url = format!("{git_proxy}/LiteLoaderQQNT/LiteLoaderQQNT/archive/master.zip");
-    let bin = http_post(rt_ptr.clone(),&patch_url,None);
+    let bin = http_post(rt_ptr.clone(), &patch_url, None);
     log::info!("下载完成");
 
     log::info!("正在解压...");
     let userdir = PathBuf::from_str(&std::env::var("USERPROFILE")?)?;
     let zip_path = userdir.join("LiteLoaderQQNT-main.zip");
     fs::write(&zip_path, bin)?;
-    extrat(&zip_path, &zip_path.parent().ok_or("can't get parent")?.join("LiteLoaderQQNT-main"),true)?;
+    extrat(&zip_path, &zip_path.parent().ok_or("can't get parent")?.join("LiteLoaderQQNT-main"), true)?;
     log::info!("解压完成");
 
     let index_file_path = qq_path.join("resources").join("app").join("app_launcher").join("index.js");
     log::info!("正在安装LiteLoaderQQNT...");
-    fs::write(index_file_path, "require(String.raw`".to_owned()+ &userdir.join("LiteLoaderQQNT-main").to_string_lossy().to_string() + "`);\r\nrequire('./launcher.node').load('external_index', module);")?;
+    fs::write(index_file_path, "require(String.raw`".to_owned() + &userdir.join("LiteLoaderQQNT-main").to_string_lossy().to_string() + "`);\r\nrequire('./launcher.node').load('external_index', module);")?;
     log::info!("LiteLoaderQQNT安装完成");
 
     log::info!("正在获取最新LLOB版本号...");
     let url = "https://api.github.com/repos/LLOneBot/LLOneBot/releases/latest";
-    let bin = http_post(rt_ptr.clone(),url,Some("Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Safari/537.36"));
-    let version_json:serde_json::Value = serde_json::from_slice(&bin)?;
+    let bin = http_post(rt_ptr.clone(), url, Some("Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Safari/537.36"));
+    let version_json: serde_json::Value = serde_json::from_slice(&bin)?;
     let tag_name = version_json["tag_name"].as_str().ok_or("Failed to get tag_name")?;
     log::info!("最新LLOB版本号:{tag_name}");
 
     log::info!("正在下载LLOB项目...");
 
     let patch_url = format!("{git_proxy}/LLOneBot/LLOneBot/releases/download/{tag_name}/LLOneBot.zip");
-    let bin = http_post(rt_ptr.clone(),&patch_url,None);
+    let bin = http_post(rt_ptr.clone(), &patch_url, None);
     log::info!("下载完成");
 
     log::info!("正在安装LLOnebOT...");
     let zip_path = userdir.join("LiteLoaderQQNT-main").join("plugins").join(format!("LLOneBot{tag_name}.zip"));
     std::fs::create_dir_all(zip_path.parent().ok_or("can't get parent")?)?;
     fs::write(&zip_path, bin)?;
-    extrat(&zip_path, &zip_path.parent().ok_or("can't get parent")?.join("LLOneBot"),false)?;
+    extrat(&zip_path, &zip_path.parent().ok_or("can't get parent")?.join("LLOneBot"), false)?;
     log::info!("安装完成");
 
     log::info!("安装成功！！！！！！！！！享受快乐时光吧");
-    
+
     Ok(())
 }

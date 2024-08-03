@@ -88,18 +88,17 @@ fn get_qq_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
     Err("can't find qq path".into())
 }
 
-fn is_qq_run(qq_path: &PathBuf) -> Result<bool, Box<dyn std::error::Error>> {
+fn is_qq_run(qq_path:&PathBuf) -> Result<bool, Box<dyn std::error::Error>>  {
     let system = sysinfo::System::new_all();
     let process_name = "QQ.exe";
     if let Some(process) = system.processes_by_name(process_name).next() {
         let process_exe_path = process.exe().ok_or("can't get process exe path")?;
-        let process_path = process_exe_path
-            .parent()
-            .ok_or("can't get process parent path")?;
-        if process_path == qq_path {
-            return Ok(true);
+        if let Some(process_path) = process_exe_path.parent() {
+            if process_path == qq_path {
+                return Ok(true)
+            }
         }
-    }
+    } 
     Ok(false)
 }
 
@@ -343,7 +342,12 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>> {
 
     init_log();
 
-    log::info!("欢迎使用LLOB安装器0.0.5 by super1207");
+    log::info!("欢迎使用LLOB安装器0.0.6 by super1207");
+
+    if let Ok(_) = std::env::var("LITELOADERQQNT_PROFILE") {
+        log::error!("检测到您的环境变量中存在LITELOADERQQNT_PROFILE，你可能已经手动安装过LiteLoaderQQNT，程序终止！");
+        app_exit();
+    }
 
     log::info!("正在检查是否拥有管理员权限...");
     let has_admin = is_admin().unwrap();
@@ -358,13 +362,18 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>> {
     let qq_path;
     if let Ok(qq_path_t) = get_qq_path() {
         qq_path = qq_path_t;
+        let electron_license_path = qq_path.join("LICENSE.electron.txt");
+        if !electron_license_path.is_file() {
+            log::error!("未找到QQ安装位置,请去安装QQ!：https://im.qq.com/pcqq/index.shtml");
+            app_exit();
+        }
         log::info!("QQ安装位置: {:?}", qq_path);
     } else {
         log::error!("未找到QQ安装位置,请去安装QQ!：https://im.qq.com/pcqq/index.shtml");
         app_exit();
     }
 
-    log::info!("正在检查QQ是否正在运行...");
+    log::info!("安装LLONEBOT需要确保QQ处于未运行状态，正在检查QQ是否正在运行...");
     match is_qq_run(&qq_path) {
         Ok(is_run) => {
             if !is_run {

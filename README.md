@@ -51,6 +51,7 @@ Priority: Configuration file > llob_install.exe directory > Registry
 MIT
 
 ## 其它注意事项
+**目前最高支持的NTQQ版本是9.9.15-26909，高于这个版本就不要使用这个脚本来安装了**
 1. 确保您已经安装最新版本的NTQQ，您应该在[QQ官网](https://im.qq.com/pcqq/index.shtml)下载的最新版本的NTQQ，并且通过双击QQ安装包来安装QQ。
 2. 确保使用install_llob.exe之前，QQ处于关闭状态。
 3. 如果QQ自动更新了，您可以重新运行install_llob.exe来安装llonebot，您的配置信息不会丢失。

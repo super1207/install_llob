@@ -29,8 +29,12 @@ fn get_apath(path: &PathBuf) -> PathBuf {
 
 fn get_qq_path_by_reg() -> Result<PathBuf, Box<dyn std::error::Error>> {
     let hkcu = winreg::RegKey::predef(winreg::enums::HKEY_LOCAL_MACHINE);
-    let qq_setting: winreg::RegKey =
-        hkcu.open_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\QQ")?;
+    let qq_setting;
+    if let Ok(val) = hkcu.open_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\QQ") {
+        qq_setting = val;
+    } else {
+        qq_setting = hkcu.open_subkey("SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\QQ")?;
+    }
     let qq_path: String = qq_setting.get_value("UninstallString")?;
     let q = PathBuf::from_str(&qq_path)?
         .parent()

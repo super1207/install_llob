@@ -56,3 +56,4 @@ MIT
 2. 确保使用install_llob.exe之前，QQ处于关闭状态。
 3. 如果QQ自动更新了，您可以重新运行install_llob.exe来安装llonebot，您的配置信息不会丢失。
 4. 如果您仍然对安装过程有所疑惑，可以看看安装视频：[视频链接](https://files.catbox.moe/psdz7v.mp4)
+5. 偷偷放一个[napcat](https://github.com/NapNeko/NapCatQQ)的人机合一[安装手本](https://files.catbox.moe/hjfdaj.zip)

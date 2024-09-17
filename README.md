@@ -4,6 +4,8 @@
 
 Fully automatic installation of LLOneboT and LiteLoaderQQNT on Windows.
 
+**目前，请使用9.9.15-28060 以下的NTQQ版本，咕**
+
 ## Usage
 
 双击exe是你需要的全部，如果遇到网络问题，就多尝试几次。

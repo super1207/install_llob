@@ -46,6 +46,8 @@ Priority: Configuration file > llob_install.exe directory > Registry
 
 [QQNTFileVerifyPatch](https://github.com/LiteLoaderQQNT/QQNTFileVerifyPatch)
 
+[LiteLoaderQQNT_Install](https://github.com/Mzdyl/LiteLoaderQQNT_Install)
+
 ## License
 
 MIT

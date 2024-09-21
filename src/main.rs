@@ -30,10 +30,10 @@ fn get_apath(path: &PathBuf) -> PathBuf {
 fn get_qq_path_by_reg() -> Result<PathBuf, Box<dyn std::error::Error>> {
     let hkcu = winreg::RegKey::predef(winreg::enums::HKEY_LOCAL_MACHINE);
     let qq_setting;
-    if let Ok(val) = hkcu.open_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\QQ") {
+    if let Ok(val) = hkcu.open_subkey(r#"Software\Microsoft\Windows\CurrentVersion\Uninstall\QQ"#) {
         qq_setting = val;
     } else {
-        qq_setting = hkcu.open_subkey("SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\QQ")?;
+        qq_setting = hkcu.open_subkey(r#"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\QQ"#)?;
     }
     let qq_path: String = qq_setting.get_value("UninstallString")?;
     let q = PathBuf::from_str(&qq_path)?
@@ -259,6 +259,34 @@ pub async fn github_proxy() -> Option<String> {
     None
 }
 
+fn fix_index_js(index_js_path:&PathBuf,userdir:&PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    let mut to_write = r#"const fs = require("fs");
+const path = require("path");
+const package_path = path.join(process.resourcesPath, "app/package.json");
+const package = require(package_path);
+package.main = "./application/app_launcher/index.js";
+fs.writeFileSync(package_path, JSON.stringify(package, null, 4), "utf-8");
+"#.to_owned();
+    to_write.push_str(&("require(String.raw`".to_owned()
+    + &userdir
+        .join("LiteLoaderQQNT-main")
+        .to_string_lossy()
+        .to_string()
+    + "`);\r\n"));
+    to_write.push_str("require('../major.node').load('internal_index', module);\r\n");
+
+    to_write.push_str("setTimeout(() => {\n");
+    to_write.push_str("    package.main = \"./app_launcher/index.js\";\n");
+    to_write.push_str("    fs.writeFileSync(package_path, JSON.stringify(package, null, 4), \"utf-8\");\n");
+    to_write.push_str("}, 0);\n");
+
+    fs::write(
+        index_js_path,
+        to_write,
+    )?;
+    Ok(())
+}
+
 fn extrat(from: &PathBuf, to: &PathBuf, flag: bool) -> Result<(), Box<dyn std::error::Error>> {
     let file = std::fs::File::open(from)?;
 
@@ -333,6 +361,14 @@ fn extrat(from: &PathBuf, to: &PathBuf, flag: bool) -> Result<(), Box<dyn std::e
     Ok(())
 }
 
+fn get_qq_version(qqpath:&PathBuf) -> Result<String, Box<dyn std::error::Error>> {
+    let config_json_path = qqpath.join("versions").join("config.json");
+    let config_str = fs::read_to_string(config_json_path)?;
+    let config_json:serde_json::Value = serde_json::from_str(&config_str)?;
+    let cur_version = config_json["curVersion"].as_str().ok_or("解析config.json失败")?;
+    return Ok(cur_version.to_owned());
+}
+
 fn main() {
     if let Err(e) = mymain() {
         log::error!("{e:?}");
@@ -341,19 +377,30 @@ fn main() {
     app_exit();
 }
 
+fn fix_package_json(package_json_path:&PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    let json_str = fs::read_to_string(package_json_path)?;
+    let mut json:serde_json::Value = serde_json::from_str(&json_str)?;
+    let json_main = json.get_mut("main").ok_or("没有在package.json中找到main字段")?;
+    *json_main = serde_json::json!("./app_launcher/index.js");
+    fs::write(
+        package_json_path,
+        serde_json::to_string_pretty(&json)?,
+    )?;
+    Ok(())
+}
+
 fn mymain() -> Result<(), Box<dyn std::error::Error>> {
     let rt_ptr: Arc<tokio::runtime::Runtime> = Arc::new(tokio::runtime::Runtime::new().unwrap());
 
     init_log();
 
-    log::info!("欢迎使用LLOB安装器0.0.8 by super1207");
+    log::info!("欢迎使用LLOB安装器0.0.9 by super1207");
 
     if let Ok(_) = std::env::var("LITELOADERQQNT_PROFILE") {
         log::error!("检测到您的环境变量中存在LITELOADERQQNT_PROFILE，你可能已经手动安装过LiteLoaderQQNT，程序终止！");
         app_exit();
     }
 
-    log::info!("正在检查是否拥有管理员权限...");
     let has_admin = is_admin().unwrap();
     if has_admin {
         log::info!("拥有管理员权限");
@@ -366,24 +413,31 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>> {
     let qq_path;
     if let Ok(qq_path_t) = get_qq_path() {
         qq_path = qq_path_t;
-        let electron_license_path = qq_path.join("LICENSE.electron.txt");
-        if !electron_license_path.is_file() {
-            log::error!("未找到QQ安装位置,请去安装QQ!：https://im.qq.com/pcqq/index.shtml");
-            app_exit();
-        }
         log::info!("QQ安装位置: {:?}", qq_path);
     } else {
         log::error!("未找到QQ安装位置,请去安装QQ!：https://im.qq.com/pcqq/index.shtml");
         app_exit();
     }
 
-    log::info!("安装LLONEBOT需要确保QQ处于未运行状态，正在检查QQ是否正在运行...");
+    let qq_version = match get_qq_version(&qq_path) {
+        Ok(ver) => ver,
+        Err(err) => {
+            log::error!("获取QQ版本号失败,注意当前安装器支持的最低NTQQ版本是9.9.15-28060:{err:?}\r\n如果您使用之前的NTQQ版本，请使用旧版安装器!");
+            app_exit();
+        },
+    };
+
+    let qq_inner_path = qq_path.join("versions").join(qq_version).join("resources").join("app");
+    let package_json_path = qq_inner_path.join("package.json");
+    let index_js_path = qq_inner_path.join("app_launcher").join("index.js");
+
+
     match is_qq_run(&qq_path) {
         Ok(is_run) => {
             if !is_run {
-                log::info!("QQ未运行");
+                // log::info!("QQ未运行");
             } else {
-                log::error!("QQ正在运行，请先结束QQ");
+                log::error!("QQ正在运行，安装LLONEBOT需要确保QQ处于未运行状态，请先结束QQ");
                 app_exit();
             }
         }
@@ -392,14 +446,7 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>> {
             app_exit();
         }
     }
-
-    log::info!("正在检查QQ位数...");
     let is_win32 = iswin32(&qq_path.join("QQ.exe"))?;
-    if is_win32 {
-        log::info!("您安装的是32位的QQ");
-    } else {
-        log::info!("您安装的是64位的QQ");
-    }
 
     log::info!("正在获取github下载代理...");
     let git_proxy = rt_ptr.block_on(async {
@@ -482,22 +529,8 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>> {
         true,
     )?;
     log::info!("解压完成");
-
-    let index_file_path = qq_path
-        .join("resources")
-        .join("app")
-        .join("app_launcher")
-        .join("index.js");
-    log::info!("正在安装LiteLoaderQQNT...");
-    fs::write(
-        index_file_path,
-        "require(String.raw`".to_owned()
-            + &userdir
-                .join("LiteLoaderQQNT-main")
-                .to_string_lossy()
-                .to_string()
-            + "`);\r\nrequire('./launcher.node').load('external_index', module);",
-    )?;
+    fix_index_js(&index_js_path,&userdir)?;
+    fix_package_json(&package_json_path)?;
     log::info!("LiteLoaderQQNT安装完成");
 
     log::info!("正在获取最新LLOB版本号...");

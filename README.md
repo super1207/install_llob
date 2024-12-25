@@ -57,3 +57,16 @@ MIT
 2. 确保使用install_llob.exe之前，QQ处于关闭状态。
 3. 如果QQ自动更新了，您可以重新运行install_llob.exe来安装llonebot，您的配置信息不会丢失。
 4. 如果您仍然对安装过程有所疑惑，可以看看安装视频：[视频链接](https://files.catbox.moe/psdz7v.mp4)
+
+## 如何卸载
+
+如果需要完全去除此安装程序带来的影响，你可以按如下步骤操作。
+
+1：打开windows控制面板->程序和功能，右键卸载QQ
+
+2：手动删除QQ的安装文件夹，默认是：`C:\Program Files\Tencent\QQNT`
+
+3(可选)：重新安装QQ
+
+4(可选)：删除[用户文件夹](https://www.baidu.com/s?wd=windows%20%E7%94%A8%E6%88%B7%E6%96%87%E4%BB%B6%E5%A4%B9%E6%98%AF%E4%BB%80%E4%B9%88)下的`LiteLoaderQQNT-main`文件夹
+

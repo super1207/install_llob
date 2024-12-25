@@ -4,6 +4,10 @@
 
 Fully automatic installation of LLOneboT and LiteLoaderQQNT on Windows.
 
+推荐操作时间：3分钟。
+
+Recommended operation time: 3 minutes.
+
 ## Usage
 
 双击exe是你需要的全部，如果遇到网络问题，就多尝试几次。

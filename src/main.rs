@@ -394,7 +394,7 @@ fn mymain() -> Result<(), Box<dyn std::error::Error>> {
 
     init_log();
 
-    log::info!("欢迎使用LLOB安装器0.0.9 by super1207");
+    log::info!("欢迎使用LLOB安装器0.0.10 by super1207");
 
     if let Ok(_) = std::env::var("LITELOADERQQNT_PROFILE") {
         log::error!("检测到您的环境变量中存在LITELOADERQQNT_PROFILE，你可能已经手动安装过LiteLoaderQQNT，程序终止！");
